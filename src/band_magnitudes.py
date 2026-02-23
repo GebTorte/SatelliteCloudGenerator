@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from enum import Enum
 
 # This file contains multiple approaches to extracting individual band magnitudes
 # If no specific band strengths for the cloud are provided, the cloud component
@@ -227,17 +228,17 @@ def q_mag(reference,mask,mask_cloudy=None, clean=None,q=0.95,q2=None):
         
         i=clean.index_select(-3,torch.tensor(idx,device=clean.device))
         base=i.quantile(q2) if not full_cloud else 1
-        cloud_mag[...,idx]=band_coefs[idx]*base        
+        cloud_mag[...,idx]=band_coefs[idx]*base
 
     return cloud_mag
 
 
 
-from enum import Enum
-
 class CloudType(Enum):
     """
     TODO: add more types
+
+    Plan is to input reference mask with cloud types and adapt refl values accordingly
     """
 
     cloud = 1
@@ -263,7 +264,7 @@ B07,783,0.80,0.70–0.90
 B08,842,0.90,0.80–1.00
 B08A,865,0.85,0.75–0.95
 B09,945,0.70,0.60–0.80
-B10,1375,0.30,0.20–0.40 / thin cirrus detected from 0.012 to 0.035. 0.035 is the thick cloud threshold
+B10,1375,0.30,0.20–0.40 / thin cirrus detected from 0.012 to 0.035. 0.035 is the thick cloud threshold (for which sat?? (modis?))
 B11,1610,0.20,0.10–0.30
 B12,2190,0.10,0.05–0.15
 
@@ -306,7 +307,7 @@ ESA (2023/2024).
 Sentinel-2 MSI Annual Performance Report. Copernicus Sentinel-2 Mission Performance Centre.
 """
 
-def fixed_mag(reference_mask:torch.Tensor, seed:int=42):
+def stat_mag(reference_mask:torch.Tensor, mask, mask_cloudy=None, seed:int=42):
     """
         Use scientifically determined cloud spectral fingerprints (their mean and distribution function) in (sen2) bands
         to generate cloud magnitudes.
@@ -322,6 +323,20 @@ def fixed_mag(reference_mask:torch.Tensor, seed:int=42):
             Tensor: Tensor containing cloud magnitudes (or ratios if clean==None)
     
     """
+    image_shape = reference_mask.shape
+
+    if mask_cloudy is None:
+        mask_clean=mask.squeeze()==0.0 
+        mask_cloudy=mask.squeeze()!=0.0 
+    else:  
+        mask_clean=mask
+        mask_cloudy=mask_cloudy
+    
+    full_cloud=(mask_clean!=1.0).all()
+    no_cloud=(mask_cloudy==0.0).all()
+   
+    if no_cloud:
+        return None
 
     shape = reference_mask.shape # (H,W,C)
 
@@ -341,9 +356,10 @@ def fixed_mag(reference_mask:torch.Tensor, seed:int=42):
         12:12
     }
 
-    channel_means = [0.55,0.58,0.59,0.60,0.61,0.61,0.62,0.62,0.63,0.25,0.35,0.22] # in order of bands
-
-    channel_std = [
+    # reflectance means and std deviations following
+     # in order of bands
+    channel_means = [0.55,0.58,0.59,0.60,0.61,0.61,0.62,0.62,0.63,0.25,0.35,0.22]
+    channel_std_q_q2 = [
         [0.32,0.78],
         [0.35,0.81],
         [0.36,0.82],
@@ -353,26 +369,16 @@ def fixed_mag(reference_mask:torch.Tensor, seed:int=42):
         [0.38,0.85],
         [0.38,0.86],
         [0.39,0.87],
-        [0.05,0.65],
+        [0.05,0.65], # cirrus (0.012 - 0.035 thin cloud, > 0.035 thick cloud (with modis/ikonos/ at least))
         [0.15,0.55],
-        [0.08,0.36],
+        [0.08,0.36], 
     ]
+                                                          
+    rng_band_coef_matrix = np.random.default_rng(seed=seed)\
+        .normal(channel_means, channel_std_q_q2, size=(image_shape[0], image_shape[1]))
 
-    i_width, i_height = 256, 256 # placeholders
+    rng_reflectance_matrix_clouds = mask_cloudy * rng_band_coef_matrix
 
-    rng_matrix = np.random.normal(channel_means, channel_std, size=(i_width, i_height))
-
-    cloud_mask = None # todo
-
-    rng_reflectance_matrix_clouds = cloud_mask * rng_matrix
-
-    # values from 0. to 1. based on channel specific statistical values
-    # shape (x, y, C)
+    # values from 0. to 1. (magnitude) based on channel specific statistical values (magnitude)
+    # shape (H, W, C)
     return rng_reflectance_matrix_clouds
-
-
-
-
-
-
-
