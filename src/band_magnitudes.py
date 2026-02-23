@@ -351,7 +351,7 @@ def stat_mag(reference_mask:torch.Tensor, mask, mask_cloudy=None, seed:int=42):
         7:7,
         8:8,
         9:9,
-        10:10,
+        10:10, # cirrus, to be excluded TODO??
         11:11,
         12:12
     }
