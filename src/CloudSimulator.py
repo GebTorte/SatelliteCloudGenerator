@@ -303,6 +303,8 @@ def add_cloud(input,
         channel_magnitude_shift=abs(channel_magnitude_shift)
         weights=channel_magnitude_shift*(2*torch.rand(c, device=device)-1)+1
         cloud=(weights[:,None,None]*cloud)
+
+    # TODO?: insert channel-wise cloud reflectance here? 
     
     # channel offset (optional)
     if channel_offset != 0:
