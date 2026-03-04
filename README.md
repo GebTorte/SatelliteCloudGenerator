@@ -124,3 +124,24 @@ def add_cloud_and_shadow(input,
 |blur_scaling (float)|Scaling factor for the variance of locally varying Gaussian blur (dependent on cloud thickness). Value of 0 will disable this feature.|`2.0`|   
 |cloud_color (bool)|If True, it will adjust the color of the cloud based on the mean color of the clear sky image|`True`|
 |return_cloud (bool)|If True, it will return a channel-wise cloud mask of shape [height, width, channels] along with the cloudy image|`True`|
+
+
+## Ideas for DL features
+- snow spectral fingerprints as negative features (separate synthetic layer, but 0 label)
+  - red/SWIR glacier feature
+- b4/b7 feature
+
+
+
+## Plan
+Generate mulitple color clouds ontop of multispectral images for a big DL dataset.
+
+RGB results:
+- white clouds with normal method
+
+stag mag method: Color | Seed
+- purple | 45
+- pink | 44
+- yellow | 43
+
+Do this for all bands ontop of clean images.

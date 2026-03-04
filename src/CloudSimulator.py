@@ -1,3 +1,4 @@
+from src.band_magnitudes import stat_mag2
 import torch as torch
 from torch.nn import functional as F
 import numpy as np
@@ -305,6 +306,9 @@ def add_cloud(input,
         cloud=(weights[:,None,None]*cloud)
 
     # TODO?: insert channel-wise cloud reflectance here? 
+    # or write independent add_cloud_* func
+    #if use_stat_method:
+    #    pass
     
     # channel offset (optional)
     if channel_offset != 0:
@@ -360,6 +364,7 @@ def add_cloud_and_shadow(input,
         max_lvl (float or tuple of floats): Indicates the maximum strength of the cloud (1.0 means that some pixels will be fully non-transparent)
         
         min_lvl (float or tuple of floats): Indicates the minimum strength of the cloud (0.0 means that some pixels will have no cloud)
+        
         channel_magnitude (Tensor) : cloud magnitudes in each channel, shape [B,C,1,1]
         
         clear_threshold (float): An optional threshold for cutting off some part of the initial generated cloud mask
@@ -435,6 +440,121 @@ def add_cloud_and_shadow(input,
                                   cloud_color=cloud_color,
                                   return_cloud=True
                                  )
+    
+    if not return_cloud:
+        return input
+    else:
+        return input, cloud_mask, shadow_mask
+    
+
+def add_cloud_and_shadow_with_stat_mag(input,
+                         max_lvl=(0.95,1.0),
+                         min_lvl=(0.0, 0.05),
+                         channel_magnitude=None,
+                         shadow_max_lvl=[0.3,0.6],
+                         clear_threshold=0.0,
+                         noise_type = 'perlin',
+                         const_scale=True,
+                         decay_factor=1,
+                         locality_degree=1,
+                         channel_offset=2,
+                         channel_magnitude_shift=0.05,
+                         blur_scaling=2.0,
+                         cloud_color=True,
+                         return_cloud=False
+                        ):
+    """ Takes an input image of shape [batch,channels,height, width]        
+        and returns a generated cloudy version of the input image, with additional shadows added to the ground image
+    
+    Args:
+        
+        input (Tensor) : input image in shape [B,C,H,W]
+    
+        max_lvl (float or tuple of floats): Indicates the maximum strength of the cloud (1.0 means that some pixels will be fully non-transparent)
+        
+        min_lvl (float or tuple of floats): Indicates the minimum strength of the cloud (0.0 means that some pixels will have no cloud)
+        
+        channel_magnitude (Tensor) : cloud magnitudes in each channel, shape [B,C,1,1]
+        
+        clear_threshold (float): An optional threshold for cutting off some part of the initial generated cloud mask
+        
+        shadow_max_lvl (float): Indicates the maximum strength of the cloud (1.0 means that some pixels will be completely black)
+        
+        noise_type (string: 'perlin', 'flex'): Method of noise generation (currently supported: 'perlin', 'flex')
+        
+        const_scale (bool): If True, the spatial frequencies of the cloud/shadow shape are scaled based on the image size (this makes the cloud preserve its appearance regardless of image resolution)
+        
+        decay_factor (float): decay factor that narrows the spectrum of the generated noise (higher values, such as 2.0 will reduce the amplitude of high spatial frequencies, yielding a 'blurry' cloud)
+        
+        locality degree (int): more local clouds shapes can be achieved by multiplying several random cloud shapes with each other (value of 1 disables this effect, and higher integers correspond to the number of multiplied masks)
+        
+        channel_offset (int): optional offset that can randomly misalign spatially the individual cloud mask channels (by a value in range -channel_offset and +channel_offset)
+        
+        blur_scaling (float): Scaling factor for the variance of locally varying Gaussian blur (dependent on cloud thickness). Value of 0 will disable this feature.
+        
+        cloud_color (bool): If True, it will adjust the color of the cloud based on the mean color of the clear sky image
+        
+        return_cloud (bool): If True, it will return a channel-wise cloud mask of shape [height, width, channels] along with the cloudy image
+        
+    Returns:
+    
+        Tensor: Tensor containing a generated cloudy image (and a cloud mask if return_cloud == True)
+  
+    """  
+    
+    # 1. Add Shadows
+    if isinstance(locality_degree,int):
+        shadow_locality_degree=locality_degree-1
+    else:
+        shadow_locality_degree=[i-1 for i in locality_degree]
+        
+    # but don't add shadows if cloud level 'floor' is above 0...
+    if isinstance(min_lvl,list) or isinstance(min_lvl,tuple):
+        if min_lvl[0] > 0.0:
+            shadow_max_lvl=0.0
+    else:
+        if min_lvl > 0.0:
+            shadow_max_lvl=0.0
+        
+    input, shadow_mask = add_cloud(input,
+                                   max_lvl=shadow_max_lvl,
+                                   min_lvl=0.0,
+                                   clear_threshold=0.4,
+                                   noise_type = 'perlin',
+                                   const_scale=const_scale,
+                                   decay_factor=1.5, # Suppress HF detail
+                                   locality_degree=shadow_locality_degree, # make similar locality as cloud (-1 works well because it's lower frequency)
+                                   invert=True, # Invert Color for shadow
+                                   channel_offset=0, # Cloud SFX disabled
+                                   channel_magnitude_shift=0.0, # Cloud SFX disable
+                                   blur_scaling=0.0, # Cloud SFX disabled
+                                   cloud_color=False, # Cloud SFX disabled
+                                   return_cloud=True
+             )
+    
+    # 2. Add Cloud
+    input, cloud_mask = add_cloud(input,
+                                  max_lvl=max_lvl,
+                                  min_lvl=min_lvl,
+                                  channel_magnitude=channel_magnitude,
+                                  clear_threshold=clear_threshold,
+                                  noise_type=noise_type,
+                                  const_scale=const_scale,
+                                  decay_factor=decay_factor,
+                                  locality_degree=locality_degree,
+                                  invert=False,
+                                  channel_offset=channel_offset,
+                                  channel_magnitude_shift=channel_magnitude_shift,
+                                  blur_scaling=blur_scaling,
+                                  cloud_color=cloud_color,
+                                  return_cloud=True
+                                 )
+    
+    # TODO:
+    # based on generated cloud mask(binary)
+    #cloud_mask = stat_mag2(
+    #    rauschen = input,
+    #)
     
     if not return_cloud:
         return input
