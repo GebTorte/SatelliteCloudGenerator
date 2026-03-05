@@ -464,7 +464,7 @@ def stat_mag(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 4
     return cloud_mag
 
 
-def stat_mag_scaler(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 42, randomness=0.01):
+def stat_mag_scaler(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 42, randomness: float =0.01):
     """
     Use scientifically determined cloud spectral fingerprints (their mean and distribution function) in (sen2) bands
     to generate cloud magnitudes as reflectance values.
@@ -479,15 +479,15 @@ def stat_mag_scaler(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: 
 
     mask_cloudy (Tensor) : optional mask, where 1.0 indicates cloud
 
+    randomness: 
+
     Returns:
 
         Tensor: Tensor containing cloud magnitudes (or ratios if clean==None)
 
     """
     if mask_cloudy:
-        no_cloud = (mask_cloudy == 0.0).all()
-
-        if no_cloud:
+        if (mask_cloudy == 0.0).all(): # no cloud
             return None
 
     channel_std_devs = [
@@ -508,15 +508,21 @@ def stat_mag_scaler(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: 
     
     scaler = np.random.default_rng(seed=seed).uniform()
 
-    additive = np.random.default_rng(seed=seed).uniform(-randomness, randomness)
-
     # cloud magnitude
     cloud_mag = torch.ones(input.shape[:-2], device=input.device)
-    for idx in range(input.shape[-3]):
-        i = input.index_select(-3, torch.tensor(idx, device=input.device))
-        # base = i.mean() if not full_cloud else 1
 
-        cloud_mag[..., idx] = additive + (channel_std_devs[idx][1] - channel_std_devs[idx][0]) * scaler  + channel_std_devs[idx][0]
+    # only for numer of bands, not image shape
+    std_devs = [(i,s) for i, s in enumerate(channel_std_devs) if i in bands]
+
+    for idx, (i,std) in zip(range(input.shape[-3]), std_devs): # loop over bands, selected std devs
+
+        # add small aritrary but random shift in value to increase variety in data
+        additive=0.
+        if randomness:
+            additive = np.random.default_rng(seed=seed).uniform(-randomness, randomness)
+        
+        cloud_mag[..., idx] = additive + (std[1] - std[0]) \
+            * scaler  + std[0]
 
     # values from 0. to 1. (magnitude) based on channel specific statistical values (more like spectral reflectance than magnitude)
     # shape (H, W, B) where B is band
