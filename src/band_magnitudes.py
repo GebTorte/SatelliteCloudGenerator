@@ -521,8 +521,8 @@ def stat_mag_scaler(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: 
         if randomness:
             additive = np.random.default_rng(seed=seed).uniform(-randomness, randomness)
         
-        cloud_mag[..., idx] = additive + (std[1] - std[0]) \
-            * scaler  + std[0]
+        cloud_mag[..., idx] = np.clip(additive + (std[1] - std[0]) \
+            * scaler  + std[0], 0.,1.)
 
     # values from 0. to 1. (magnitude) based on channel specific statistical values (more like spectral reflectance than magnitude)
     # shape (H, W, B) where B is band
