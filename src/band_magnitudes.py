@@ -466,7 +466,7 @@ def stat_mag(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 4
     return cloud_mag
 
 
-def stat_mag_scaler(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 42, randomness: float =0.01):
+def stat_mag_scaler(input: torch.Tensor, omitt_band_idxs=[10], mask_cloudy=None, seed: int = 42, randomness: float =0.01):
     """
     Use scientifically determined cloud spectral fingerprints (their mean and distribution function) in (sen2) bands
     to generate cloud magnitudes as reflectance values.
@@ -510,13 +510,12 @@ def stat_mag_scaler(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: 
     
     scaler = np.random.default_rng(seed=seed).uniform()
 
-    # cloud magnitude
     cloud_mag = torch.ones(input.shape[:-2], device=input.device)
 
-    # only for numer of bands, not image shape
-    std_devs = [(i,s) for i, s in enumerate(channel_std_devs) if i in bands]
-
     for idx, (i,std) in zip(range(input.shape[-3]), std_devs): # loop over bands, selected std devs
+        if idx+1 in omitt_band_idxs:
+            # then do not manipulate img for this band
+            continue
 
         # add small aritrary but random shift in value to increase variety in data
         additive=0.
