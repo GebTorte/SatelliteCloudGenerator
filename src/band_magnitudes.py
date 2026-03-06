@@ -310,7 +310,7 @@ Sentinel-2 MSI Annual Performance Report. Copernicus Sentinel-2 Mission Performa
 """
 
 
-def stat_mag(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 42):
+def stat_mag_2d(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 42):
     """
     Use scientifically determined cloud spectral fingerprints (their mean and distribution function) in (sen2) bands
     to generate cloud magnitudes as reflectance values.
@@ -353,18 +353,18 @@ def stat_mag(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 4
         0.22,
     ]
     channel_std_devs = [
-        0.225,
-        0.225,
-        0.225,
-        0.23,
-        0.23,
-        0.23,
-        0.23,
-        0.24,
-        0.24,
-        0.3,  # cirrus (0.012 - 0.035 thin cloud, > 0.035 thick cloud (with modis/ikonos/ at least))
-        0.2,
-        0.14,
+        [0.32, 0.78],
+        [0.35, 0.81],
+        [0.36, 0.82],
+        [0.38, 0.85],
+        [0.37, 0.83],
+        [0.37, 0.84],
+        [0.38, 0.85],
+        [0.38, 0.86],
+        [0.39, 0.87],
+        [0.05, 0.65],  # cirrus (0.012 - 0.035 thin cloud, > 0.035 thick cloud (with modis/ikonos/ at least))
+        [0.15, 0.55],
+        [0.08, 0.36],
     ]
 
     # todo do only for bands
@@ -385,7 +385,9 @@ def stat_mag(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 4
 
     # values from 0. to 1. (magnitude) based on channel specific statistical values (more like spectral reflectance than magnitude)
     # shape (H, W, B) where B is band
-    return cloud_ma
+    return cloud_mag
+
+
 def stat_mag(input: torch.Tensor, bands=[1,2,3], mask_cloudy=None, seed: int = 42):
     """
     Use scientifically determined cloud spectral fingerprints (their mean and distribution function) in (sen2) bands
