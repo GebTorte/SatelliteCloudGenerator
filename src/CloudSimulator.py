@@ -1,4 +1,3 @@
-from src.band_magnitudes import stat_mag2
 import torch as torch
 from torch.nn import functional as F
 import numpy as np
@@ -297,6 +296,7 @@ def add_cloud(input,
         net_noise_shape /= net_noise_shape.max()
 
     # channel-wise mask
+    # normalized between 0 and 1
     cloud=(net_noise_shape.unsqueeze(1)*(max_lvl-min_lvl) + min_lvl).expand(b,c,h,w)
     
     # channel-wise thickness difference

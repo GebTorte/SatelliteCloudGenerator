@@ -512,18 +512,18 @@ def stat_mag_scaler(input: torch.Tensor, omitt_band_idxs=[10], mask_cloudy=None,
 
     cloud_mag = torch.ones(input.shape[:-2], device=input.device)
 
-    for idx, (i,std) in zip(range(input.shape[-3]), std_devs): # loop over bands, selected std devs
+    for idx, (lstd,hstd) in zip(range(input.shape[-3]), channel_std_devs): # loop over bands, selected std devs
         if idx+1 in omitt_band_idxs:
             # then do not manipulate img for this band
             continue
 
         # add small aritrary but random shift in value to increase variety in data
         additive=0.
-        if randomness:
+        if randomness != 0.0:
             additive = np.random.default_rng(seed=seed).uniform(-randomness, randomness)
         
-        cloud_mag[..., idx] = np.clip(additive + (std[1] - std[0]) \
-            * scaler  + std[0], 0.,1.)
+        cloud_mag[..., idx] = np.clip(additive + (hstd - lstd) \
+            * scaler  + lstd, 0.,1.)
 
     # values from 0. to 1. (magnitude) based on channel specific statistical values (more like spectral reflectance than magnitude)
     # shape (H, W, B) where B is band
